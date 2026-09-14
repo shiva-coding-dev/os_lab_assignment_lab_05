@@ -1,0 +1,12 @@
+$ resourceorder_fixed
+[t=175] A waits for Lock1
+[t=175] acquired Lock1
+[t=176] B waits for Lock1
+[t=181] waiting for Lock2
+[t=181] critical section
+[t=181] released both locks
+[t=182] acquired Lock1
+[t=187] waiting for Lock2
+[t=187] critical section
+[t=187] released both locks
+RESOURCEORDER_FIXED DONE

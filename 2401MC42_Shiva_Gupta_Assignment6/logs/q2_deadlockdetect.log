@@ -1,0 +1,14 @@
+$ deadlockdetect
+== Acyclic scenario ==
+Edges:
+P1 -> P0
+P3 -> P1
+NO DEADLOCK: graph is acyclic
+== Three-process circular wait ==
+Edges:
+P0 -> P1
+P1 -> P2
+P2 -> P0
+P3 -> P0
+DEADLOCK: cycle P0 -> P1 -> P2 -> P0
+DEADLOCKDETECT DONE

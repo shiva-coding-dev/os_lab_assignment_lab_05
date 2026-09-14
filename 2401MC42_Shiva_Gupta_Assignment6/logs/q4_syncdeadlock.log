@@ -1,0 +1,20 @@
+$ syncdeadlock
+P0: requests printer (cycle 1)
+P0: granted printer (cycle 1)
+P0: requests scanner (cycle 1)
+P0: granted scanner (cycle 1)
+P0: working with printer + scanner
+P1: requests scanner (cycle 1)
+P2: requests printer (cycle 1)
+P2: granted printer (cycle 1)
+P2: requests scanner (cycle 1)
+P3: requests printer (cycle 1)
+P4: requests scanner (cycle 1)
+P0: released both resources
+P1: granted scanner (cycle 1)
+P1: requests disk (cycle 1)
+P1: granted disk (cycle 1)
+P1: working with scanner + disk
+... interleaved resource requests, work, and releases for four cycles ...
+completed: 4 4 4 4 4
+SYNCDEADLOCK PASS

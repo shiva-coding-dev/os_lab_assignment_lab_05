@@ -1,0 +1,9 @@
+--- Makefile
++++ Makefile
+@@
+  _dining\
++ _bankers\
++ _deadlockdetect\
++ _ro_bad\
++ _ro_fixed\
++ _syncdeadlock\

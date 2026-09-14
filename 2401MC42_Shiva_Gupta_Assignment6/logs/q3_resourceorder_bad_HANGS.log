@@ -1,0 +1,8 @@
+$ resourceorder_bad
+[t=5] A waits for Lock1
+[t=6] A acquired Lock1
+[t=6] B waits for Lock2
+[t=7] B acquired Lock2
+[t=11] A waits for Lock2
+[t=12] B waits for Lock1
+--- no further output: circular wait confirmed; run terminated after timeout ---
