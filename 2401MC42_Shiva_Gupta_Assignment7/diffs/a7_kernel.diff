@@ -1,0 +1,172 @@
+--- xv6-pristine/proc.h
++++ xv6-assignment7/proc.h
+@@
+   struct file *ofile[NOFILE];
+   struct inode *cwd;
+   char name[16];
++  int isthread;                 // shares pgdir with its address-space owner
++  struct proc *threadparent;
++  int priority;                 // 1 is highest, 20 is lowest
++  int wait_ticks;
+ };
+--- xv6-pristine/proc.c
++++ xv6-assignment7/proc.c
+@@
++static int
++valid_stack(uint sp)
++{
++  return sp % 4 == 0;
++}
++
++int
++clone(void (*fcn)(void*), void *arg, void *stack)
++{
++  struct proc *p = myproc(), *np;
++  uint sp;
++  if(!fcn || !stack || !valid_stack((uint)stack)) return -1;
++  if((np = allocproc()) == 0) return -1;
++  np->pgdir = p->pgdir;
++  np->sz = p->sz;
++  np->parent = p;
++  np->threadparent = p->threadparent ? p->threadparent : p;
++  np->isthread = 1;
++  *np->tf = *p->tf;
++  sp = (uint)stack - 4;
++  if(copyout(np->pgdir, sp, (char*)&arg, 4) < 0) { np->state = UNUSED; return -1; }
++  np->tf->eip = (uint)fcn;
++  np->tf->esp = sp;
++  np->tf->eax = 0;
++  safestrcpy(np->name, "thread", sizeof(np->name));
++  acquire(&ptable.lock); np->state = RUNNABLE; release(&ptable.lock);
++  return np->pid;
++}
++
++int
++join(void)
++{
++  struct proc *p, *cur = myproc();
++  int found;
++  acquire(&ptable.lock);
++  for(;;) {
++    found = 0;
++    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
++      if(p->parent == cur && p->isthread) {
++        found = 1;
++        if(p->state == ZOMBIE) { kfree(p->kstack); p->kstack=0; p->state=UNUSED; release(&ptable.lock); return 0; }
++      }
++    if(!found || cur->killed) { release(&ptable.lock); return -1; }
++    sleep(cur, &ptable.lock);
++  }
++}
+@@
+   np->state = RUNNABLE;
++  np->priority = 10;
++  np->wait_ticks = 0;
+@@
+ void
+ scheduler(void)
+ {
+   struct proc *p;
++  struct proc *best;
+@@
+     sti();
++    best = 0;
+     acquire(&ptable.lock);
+     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+       if(p->state != RUNNABLE) continue;
++      p->wait_ticks++;
++      if(p->wait_ticks > 30) { if(p->priority > 1) p->priority--; p->wait_ticks=0; }
++      if(best == 0 || p->priority < best->priority) best = p;
++    }
++    if(best) { p = best; p->wait_ticks=0; switchuvm(p); p->state=RUNNING; swtch(&cpu->scheduler, p->context); switchkvm(); }
+     release(&ptable.lock);
+   }
+ }
+@@
+   if(curproc->isthread) { curproc->state=ZOMBIE; wakeup1(curproc->parent); sched(); }
++  // Only the address-space owner frees pgdir; threads share it.
+@@
+   if(p->state == ZOMBIE) {
++    if(p->isthread) continue;
+     kfree(p->kstack);
+--- xv6-pristine/sync.c
++++ xv6-assignment7/sync.c
++#include "types.h"
++#include "defs.h"
++#include "param.h"
++#include "spinlock.h"
++#include "proc.h"
++#define NSEMS 10
++struct semaphore { int value; struct spinlock lock; int used; };
++static struct semaphore sems[NSEMS];
++void seminitall(void) { int i; for(i=0;i<NSEMS;i++){initlock(&sems[i].lock,"sem");sems[i].used=0;} }
++int sem_init(int id,int value) { if(id<0||id>=NSEMS||value<0)return -1; acquire(&sems[id].lock); sems[id].value=value; sems[id].used=1; release(&sems[id].lock); return 0; }
++int sem_wait(int id) { if(id<0||id>=NSEMS||!sems[id].used)return -1; acquire(&sems[id].lock); while(sems[id].value==0){sleep(&sems[id],&sems[id].lock); if(myproc()->killed){release(&sems[id].lock);return -1;}} sems[id].value--; release(&sems[id].lock); return 0; }
++int sem_signal(int id) { if(id<0||id>=NSEMS||!sems[id].used)return -1; acquire(&sems[id].lock); sems[id].value++; wakeup(&sems[id]); release(&sems[id].lock); return 0; }
+--- xv6-pristine/sysproc.c
++++ xv6-assignment7/sysproc.c
+@@
++int sys_clone(void){ void(*f)(void*); void *arg,*stack; if(argptr(0,(void*)&f,sizeof(f))<0||argptr(1,(void*)&arg,sizeof(arg))<0||argptr(2,(void*)&stack,sizeof(stack))<0)return -1; return clone(f,arg,stack); }
++int sys_join(void){ return join(); }
++int sys_sem_init(void){int id,v;if(argint(0,&id)<0||argint(1,&v)<0)return -1;return sem_init(id,v);}
++int sys_sem_wait(void){int id;if(argint(0,&id)<0)return -1;return sem_wait(id);}
++int sys_sem_signal(void){int id;if(argint(0,&id)<0)return -1;return sem_signal(id);}
++int sys_set_priority(void){int pid,pr;if(argint(0,&pid)<0||argint(1,&pr)<0||pr<1||pr>20)return -1;return setpriority(pid,pr);}
++int sys_get_priority(void){int pid;if(argint(0,&pid)<0)return -1;return getpriority(pid);}
+--- xv6-pristine/syscall.h
++++ xv6-assignment7/syscall.h
+@@
++#define SYS_clone 22
++#define SYS_join 23
++#define SYS_sem_init 24
++#define SYS_sem_wait 25
++#define SYS_sem_signal 26
++#define SYS_set_priority 27
++#define SYS_get_priority 28
+--- xv6-pristine/syscall.c
++++ xv6-assignment7/syscall.c
+@@
++extern int sys_clone(void), sys_join(void), sys_sem_init(void), sys_sem_wait(void), sys_sem_signal(void), sys_set_priority(void), sys_get_priority(void);
+@@
++[SYS_clone] sys_clone, [SYS_join] sys_join, [SYS_sem_init] sys_sem_init,
++[SYS_sem_wait] sys_sem_wait, [SYS_sem_signal] sys_sem_signal,
++[SYS_set_priority] sys_set_priority, [SYS_get_priority] sys_get_priority,
+--- xv6-pristine/user.h
++++ xv6-assignment7/user.h
+@@
++int clone(void (*)(void*), void*, void*);
++int join(void);
++int sem_init(int, int);
++int sem_wait(int);
++int sem_signal(int);
++int set_priority(int, int);
++int get_priority(int);
+--- xv6-pristine/usys.S
++++ xv6-assignment7/usys.S
+@@
++SYSCALL(clone)
++SYSCALL(join)
++SYSCALL(sem_init)
++SYSCALL(sem_wait)
++SYSCALL(sem_signal)
++SYSCALL(set_priority)
++SYSCALL(get_priority)
+--- xv6-pristine/defs.h
++++ xv6-assignment7/defs.h
+@@
++int clone(void (*)(void*), void*, void*);
++int join(void);
++void seminitall(void);
++int sem_init(int, int);
++int sem_wait(int);
++int sem_signal(int);
++int setpriority(int, int);
++int getpriority(int);
+--- xv6-pristine/Makefile
++++ xv6-assignment7/Makefile
+@@
+  _dining\
++ _threadtest\
++ _synctest\
++ _deadlock\
++ _priotest\

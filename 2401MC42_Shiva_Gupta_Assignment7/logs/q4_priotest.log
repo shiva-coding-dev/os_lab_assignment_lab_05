@@ -1,0 +1,12 @@
+$ priotest
+pid=4 priority=1 progress=0
+pid=5 priority=5 progress=0
+pid=6 priority=10 progress=0
+pid=7 priority=20 progress=0
+pid=4 priority=1 complete
+pid=5 priority=5 complete
+pid=6 priority=10 complete
+pid=7 priority=19 progress=1
+pid=7 priority=18 progress=2
+pid=7 priority=18 complete
+PRIOTEST PASS: priority order observed; priority 20 completed

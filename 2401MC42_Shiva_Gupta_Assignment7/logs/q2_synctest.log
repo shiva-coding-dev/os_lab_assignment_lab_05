@@ -1,0 +1,10 @@
+$ synctest
+produced 1
+consumed 1
+produced 2
+consumed 2
+...
+produced 20
+consumed 20
+SYNCTEST counter=300000 expected=300000
+SYNCTEST producer-consumer PASS

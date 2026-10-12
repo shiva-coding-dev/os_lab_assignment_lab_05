@@ -1,0 +1,13 @@
+$ deadlock
+DEADLOCK safe case:
+  finish P1, Available=(5,3,2)
+  finish P3, Available=(7,4,3)
+  finish P4, Available=(7,4,5)
+  finish P0, Available=(7,5,5)
+  finish P2, Available=(10,5,7)
+  SAFE
+DEADLOCK circular-wait case:
+  deadlocked P0
+  deadlocked P1
+  DEADLOCK DETECTED
+DEADLOCK banker request (P0,3,3,0): unsafe request rejected

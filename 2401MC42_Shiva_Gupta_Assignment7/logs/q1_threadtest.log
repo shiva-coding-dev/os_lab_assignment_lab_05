@@ -1,0 +1,5 @@
+$ threadtest
+thread 0 finished
+thread 1 finished
+thread 2 finished
+THREADTEST counter=214683 expected=300000 (race is intentional)
