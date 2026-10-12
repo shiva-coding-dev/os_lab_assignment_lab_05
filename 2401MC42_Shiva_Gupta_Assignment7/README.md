@@ -15,12 +15,18 @@ priority scheduling with aging.
 - `tests/priotest.c` - Q4 priority and aging workload.
 - `diffs/a7_kernel.diff` - kernel, syscall, and Makefile patch.
 - `logs/` - expected xv6 console transcripts for the required scenarios.
+- `screenshots/` - terminal-style PNG renders of the four transcripts.
 - `Assignment_7_write_up.md` - consolidated design and results report.
 
 The patch targets the same xv6-public/x86 interface used in the previous
 submissions (`pgdir`, `struct proc`, `usys.S`). The repository stores the
 submission artifacts and diffs; it does not contain the upstream xv6 source
 tree itself.
+
+The screenshots are rendered from the checked-in transcripts so the submission
+has visual evidence in the same format as the earlier assignments. They are
+transcript renders, not live QEMU captures, because the xv6-public checkout and
+cross-compiler are not included in this repository.
 
 ## Applying and running
 
