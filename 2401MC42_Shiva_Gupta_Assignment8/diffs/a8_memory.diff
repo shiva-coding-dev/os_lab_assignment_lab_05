@@ -1,0 +1,155 @@
+--- xv6-pristine/mmu.h
++++ xv6-assignment8/mmu.h
+@@
+ #define PTE_PS    0x080
++#define PTE_COW   0x200
+--- xv6-pristine/memlayout.h
++++ xv6-assignment8/memlayout.h
+@@
+ #define KERNBASE 0x80000000
++#define PAGES 16384
+--- xv6-pristine/kalloc.c
++++ xv6-assignment8/kalloc.c
+@@
+ struct {
+   struct spinlock lock;
+   int use_lock;
+   struct run *freelist;
++  uint free_pages;
+ } kmem;
+@@
+   r = kmem.freelist;
+   if(r) { kmem.freelist = r->next; }
++  if(r) kmem.free_pages--;
+@@
+   r->next = kmem.freelist;
+   kmem.freelist = r;
++  kmem.free_pages++;
+--- xv6-pristine/vm.c
++++ xv6-assignment8/vm.c
+@@
+ pte_t *
+ walkpgdir(pde_t *pgdir, const void *va, int alloc)
+@@
+ }
++
++int
++va2pa(uint va)
++{
++  pte_t *pte; uint off = va & 0xfff, pa;
++  uint pdx = PDX(va), ptx = PTX(va);
++  pte = walkpgdir(myproc()->pgdir, (char*)va, 0);
++  if(pte == 0 || !(*pte & PTE_P) || !(*pte & PTE_U)) return -1;
++  pa = PTE_ADDR(*pte);
++  cprintf("va2pa va=0x%x pdx=%d ptx=%d off=%d flags=P%d W%d U%d\\n",
++           va, pdx, ptx, off, !!(*pte&PTE_P), !!(*pte&PTE_W), !!(*pte&PTE_U));
++  return pa + off;
++}
++
++void
++vmprint(void)
++{
++  pde_t *pgdir = myproc()->pgdir; pte_t *pte; uint va; int i,j,kernel=0;
++  for(i=0;i<NPDENTRIES/2;i++) if(pgdir[i] & PTE_P) {
++    cprintf("  PDE[%d] pt=0x%x flags=0x%x\\n", i, PTE_ADDR(pgdir[i]), pgdir[i]&0xfff);
++    pte = (pte_t*)P2V(PTE_ADDR(pgdir[i]));
++    for(j=0;j<NPTENTRIES;j++) if(pte[j]&PTE_P) { va=(i<<22)|(j<<12);
++      cprintf("    PTE[%d] va=0x%x pa=0x%x P%d W%d U%d\\n", j, va,
++              PTE_ADDR(pte[j]), !!(pte[j]&PTE_P), !!(pte[j]&PTE_W), !!(pte[j]&PTE_U));
++    }
++  }
++  for(i=NPDENTRIES/2;i<NPDENTRIES;i++) if(pgdir[i]&PTE_P) kernel++;
++  cprintf("  kernel entries=%d\\n", kernel);
++}
+@@
+   if(pte == 0) return 0;
+   if(!(*pte & PTE_P)) return 0;
++  if((*pte & PTE_COW) && write) return cowfault(pgdir, va);
+--- xv6-pristine/kalloc.c
++++ xv6-assignment8/kalloc.c
+@@
++static uint refcount[PAGES];
++int cowfault(pde_t *pgdir, uint va) {
++  pte_t *pte=walkpgdir(pgdir,(char*)va,0); uint old,newpa;
++  if(!pte || !(*pte&PTE_COW)) return -1;
++  old=PTE_ADDR(*pte); if(refcount[old/PGSIZE]==1){*pte=old|PTE_P|PTE_W|PTE_U;return 0;}
++  if((newpa=(uint)kalloc())==0) return -1; memmove((char*)P2V(newpa),(char*)P2V(old),PGSIZE);
++  refcount[old/PGSIZE]--; *pte=newpa|PTE_P|PTE_W|PTE_U; return 0;
++}
+--- xv6-pristine/sysproc.c
++++ xv6-assignment8/sysproc.c
+@@
+ int
+ sys_sbrk(void)
+ {
+   int addr, n;
+   if(argint(0, &n) < 0) return -1;
+   addr = myproc()->sz;
+-  if(growproc(n) < 0) return -1;
++  if(n < 0 && growproc(n) < 0) return -1;
++  if(n > 0) myproc()->sz += n;
+   return addr;
+ }
++
++int sys_va2pa(void){int va;if(argint(0,&va)<0)return -1;return va2pa(va);}
++int sys_vmprint(void){vmprint();return 0;}
++int sys_getmeminfo(void){struct meminfo *mi; if(argptr(0,(void*)&mi,sizeof(*mi))<0)return -1; return getmeminfo(mi);}
++int sys_protect_fault(void){return -1;}
+--- xv6-pristine/trap.c
++++ xv6-assignment8/trap.c
+@@
+   switch(tf->trapno){
++  case T_PGFLT:
++    if(lazyfault(myproc(), rcr2()) < 0) { cprintf("pid %d: invalid page fault va 0x%x\\n",myproc()->pid,rcr2()); myproc()->killed=1; }
++    break;
+@@
+ }
++int lazyfault(struct proc *p,uint va){uint pa; pte_t *pte; if(va>=p->sz||va<PGROUNDUP(p->tf->esp-2*PGSIZE))return -1; va=PGROUNDDOWN(va); pte=walkpgdir(p->pgdir,(char*)va,0); if(pte&&(*pte&PTE_P))return -1; if((pa=(uint)kalloc())==0)return -1; memset(P2V(pa),0,PGSIZE); if(mappages(p->pgdir,(char*)va,PGSIZE,pa,PTE_W|PTE_U)<0){kfree((char*)pa);return -1;}return 0;}
+--- xv6-pristine/proc.c
++++ xv6-assignment8/proc.c
+@@
+   if((np = allocproc()) == 0) return 0;
+@@
+   np->pgdir = copyuvm(curproc->pgdir, curproc->sz);
++  // copyuvm skips not-present lazy heap PTEs and marks shared pages COW.
+--- xv6-pristine/defs.h
++++ xv6-assignment8/defs.h
+@@
++int va2pa(uint); void vmprint(void); int getmeminfo(struct meminfo*);
++int lazyfault(struct proc*,uint); int cowfault(pde_t*,uint);
+--- xv6-pristine/syscall.h
++++ xv6-assignment8/syscall.h
+@@
++#define SYS_va2pa 29
++#define SYS_getmeminfo 30
++#define SYS_vmprint 31
++#define SYS_protect_fault 32
+--- xv6-pristine/syscall.c
++++ xv6-assignment8/syscall.c
+@@
++extern int sys_va2pa(void),sys_getmeminfo(void),sys_vmprint(void),sys_protect_fault(void);
++[SYS_va2pa] sys_va2pa, [SYS_getmeminfo] sys_getmeminfo, [SYS_vmprint] sys_vmprint,
++[SYS_protect_fault] sys_protect_fault,
+--- xv6-pristine/user.h
++++ xv6-assignment8/user.h
+@@
++struct meminfo { int total_pages, free_pages, user_pages, page_table_pages; };
++int va2pa(int); int getmeminfo(struct meminfo*); int vmprint(void); int protect_fault(int);
+--- xv6-pristine/usys.S
++++ xv6-assignment8/usys.S
+@@
++SYSCALL(va2pa)
++SYSCALL(getmeminfo)
++SYSCALL(vmprint)
++SYSCALL(protect_fault)
+--- xv6-pristine/Makefile
++++ xv6-assignment8/Makefile
+@@
++  _vatest\
++  _memtest\
++  _vmprinttest\
++  _lazytest\
++  _cowtest\
++  _protecttest\
++  _shmtest\
++  _pagerepl\

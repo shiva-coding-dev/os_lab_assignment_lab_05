@@ -1,0 +1,7 @@
+$ pagerepl
+PAGEREPL refs=7,0,1,2,0,3,0,4,2,3,0,3,2 frames=3
+algorithm   page_faults
+FIFO        10
+LRU         9
+Optimal     7
+PAGEREPL PASS: Optimal <= LRU <= FIFO for this trace

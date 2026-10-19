@@ -1,0 +1,4 @@
+$ cowtest
+COW child private value=20
+COW parent value=10 free-before=3950 free-after=3950
+COWTEST PASS: write fault created private frame

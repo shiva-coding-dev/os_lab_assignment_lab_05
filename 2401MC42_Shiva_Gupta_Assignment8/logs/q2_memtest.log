@@ -1,0 +1,6 @@
+$ memtest
+baseline total=4096 free=3950 user=5 pagetables=2
+after-grow-and-touch total=4096 free=3946 user=9 pagetables=2
+child-after-fork total=4096 free=3940 user=9 pagetables=2
+after-reap total=4096 free=3946 user=9 pagetables=2
+MEMTEST free-before=3950 free-after-reap=3946 PASS

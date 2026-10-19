@@ -1,0 +1,6 @@
+$ lazytest
+LAZY reserve 33554432 bytes
+before free=3950 user=5
+after-sbrk-no-touch free=3950 user=8197
+after-three-touches free=3947 user=8197
+LAZYTEST PASS: sparse faults, fork, and exit completed

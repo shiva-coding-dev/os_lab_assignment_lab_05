@@ -1,0 +1,6 @@
+$ protecttest
+PROTECT text page is mapped P=1 W=0 U=1
+PROTECT child: attempted write to read-only text
+pid 4: protection fault va 0x1000; killed
+PROTECT invalid address above sz rejected
+PROTECTTEST PASS: parent survived both user faults

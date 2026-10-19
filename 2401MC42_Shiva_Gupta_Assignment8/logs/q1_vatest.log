@@ -1,0 +1,10 @@
+$ vatest
+VATABLE global/local/heap:
+global va=0x2000 pa=0x6000
+local va=0x7ffff000 pa=0x7000
+heap va=0x4000 pa=0x8000
+unmapped va=0x7fffffff pa=-1
+child global va=0x2000 pa=0x9000
+VATest child-copy PASS
+parent global va=0x2000 pa=0x6000
+VATEST PASS

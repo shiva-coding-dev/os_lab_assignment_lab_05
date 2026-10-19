@@ -1,0 +1,14 @@
+$ vmprinttest
+VMPRINT initial
+  PDE[0] pt=0x00112000 flags=0x007
+    PTE[2] va=0x00002000 pa=0x00006000 P1 W1 U1
+    PTE[1023] va=0x003ff000 pa=0x00007000 P1 W0 U0  <stack guard>
+VMPRINT after sbrk(8*PGSIZE)
+  PDE[0] pt=0x00112000 flags=0x007
+    PTE[2] va=0x00002000 pa=0x00006000 P1 W1 U1
+    PTE[3]..[10] heap pages P1 W1 U1
+    PTE[1023] va=0x003ff000 pa=0x00007000 P1 W0 U0  <stack guard>
+VMPRINT after sbrk(-PGSIZE)
+  heap pages present: 7
+  kernel entries=4
+VMPRINTTEST PASS: guard page is P=1 W=0 U=0
